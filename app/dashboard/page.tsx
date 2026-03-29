@@ -3,11 +3,22 @@ import { StatCard } from "@/components/ui/StatCard";
 import { supabase } from "@/lib/supabase/client";
 
 export default async function DashboardPage() {
-  const { data: customers } = await supabase.from("customers").select("*");
-  const { data: lives } = await supabase
-    .from("lives")
-    .select("*")
-    .eq("status", "active");
+  const [{ data: customers }, { data: activeLives }, { data: items }, { data: paidItems }] =
+    await Promise.all([
+      supabase.from("customers").select("*"),
+      supabase.from("lives").select("*").eq("status", "active"),
+      supabase
+        .from("items")
+        .select("price,status")
+        .in("status", ["pending_payment", "in_cart", "paid"]),
+      supabase.from("items").select("price").eq("status", "paid"),
+    ]);
+
+  const pendingCount =
+    items?.filter((item) => item.status === "pending_payment").length || 0;
+
+  const totalPaid =
+    paidItems?.reduce((acc, item) => acc + (item.price || 0), 0) || 0;
 
   return (
     <AppShell
@@ -16,8 +27,8 @@ export default async function DashboardPage() {
     >
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Live activo"
-          value={String(lives?.length || 0)}
+          label="Lives activos"
+          value={String(activeLives?.length || 0)}
           helper="Transmisiones activas"
         />
         <StatCard
@@ -27,13 +38,13 @@ export default async function DashboardPage() {
         />
         <StatCard
           label="Pendientes de pago"
-          value="0"
-          helper="Todavía fijo"
+          value={String(pendingCount)}
+          helper="Pago inicial aún no confirmado"
         />
         <StatCard
-          label="Total estimado"
-          value="Gs. 0"
-          helper="Todavía fijo"
+          label="Total pagado"
+          value={`Gs. ${totalPaid.toLocaleString("es-PY")}`}
+          helper="Prendas marcadas como pagadas"
         />
       </div>
     </AppShell>

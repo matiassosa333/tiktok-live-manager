@@ -54,9 +54,6 @@ export function LiveManager() {
 
   useEffect(() => {
     setGeneratedCode(generateRandomCode());
-  }, []);
-
-  useEffect(() => {
     loadInitialData();
   }, []);
 
@@ -131,6 +128,7 @@ export function LiveManager() {
       `
       )
       .eq("live_id", liveId)
+      .neq("status", "cancelled")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -254,6 +252,27 @@ export function LiveManager() {
     setStatus("in_cart");
   }
 
+  async function cancelItem(itemId: string) {
+    const ok = window.confirm("¿Seguro que querés cancelar esta prenda?");
+    if (!ok || !activeLive) return;
+
+    const { error } = await supabase
+      .from("items")
+      .update({
+        status: "cancelled",
+        reserved_until: null,
+      })
+      .eq("id", itemId);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Prenda cancelada.");
+    await loadItems(activeLive.id);
+  }
+
   return (
     <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
       <SectionCard
@@ -266,7 +285,7 @@ export function LiveManager() {
           <div className="space-y-3">
             <p className="text-sm text-red-600">No hay un live activo.</p>
             <p className="text-sm text-slate-600">
-              Primero necesitás una fila en la tabla lives con status = active.
+              Primero necesitás crear y activar un live desde la sección Lives.
             </p>
           </div>
         ) : (
@@ -442,7 +461,9 @@ export function LiveManager() {
         description="Últimas prendas cargadas en este live."
       >
         {items.length === 0 ? (
-          <p className="text-sm text-slate-600">Todavía no hay prendas cargadas.</p>
+          <p className="text-sm text-slate-600">
+            Todavía no hay prendas cargadas.
+          </p>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
@@ -468,6 +489,13 @@ export function LiveManager() {
                     <p className="text-sm capitalize text-slate-600">
                       {item.status.replace("_", " ")}
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => cancelItem(item.id)}
+                      className="mt-2 rounded-xl border border-red-300 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Cancelar
+                    </button>
                   </div>
                 </div>
               </div>
