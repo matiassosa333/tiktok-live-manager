@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_PATHS = ["/acceso"];
 const PUBLIC_API_PREFIX = "/api/acceso";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (
