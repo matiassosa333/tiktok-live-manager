@@ -45,12 +45,16 @@ export function Sidebar() {
       </nav>
 
       <div className="mt-auto pt-4">
-        <Link
-          href="/api/acceso/logout"
-          className="block rounded-2xl border border-slate-700 px-4 py-3 text-center text-sm font-medium text-slate-200 hover:bg-slate-800"
+        <button
+          type="button"
+          onClick={() => {
+            sessionStorage.removeItem("app_access");
+            window.location.href = "/acceso";
+          }}
+          className="block w-full rounded-2xl border border-slate-700 px-4 py-3 text-center text-sm font-medium text-slate-200 hover:bg-slate-800"
         >
           Salir
-        </Link>
+        </button>
       </div>
     </aside>
   );

@@ -1,18 +1,43 @@
-export const dynamic = "force-dynamic";
+"use client";
 
-type AccessPageProps = {
-  searchParams: Promise<{
-    next?: string;
-    error?: string;
-  }>;
-};
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
-export default async function AccessPage({
-  searchParams,
-}: AccessPageProps) {
-  const params = await searchParams;
-  const next = params.next || "/dashboard";
-  const error = params.error || "";
+export default function AccessPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+
+  const next = searchParams.get("next") || "/dashboard";
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("app_access");
+    if (saved === "ok") {
+      router.replace(next);
+    }
+  }, [next, router]);
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setMessage("");
+
+    const expectedPassword = process.env.NEXT_PUBLIC_APP_ACCESS_PASSWORD;
+
+    if (!expectedPassword) {
+      setMessage("Falta NEXT_PUBLIC_APP_ACCESS_PASSWORD.");
+      return;
+    }
+
+    if (password !== expectedPassword) {
+      setMessage("Contraseña incorrecta.");
+      return;
+    }
+
+    sessionStorage.setItem("app_access", "ok");
+    router.replace(next);
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -22,22 +47,21 @@ export default async function AccessPage({
           Ingresá la contraseña para entrar al panel.
         </p>
 
-        <form action="/api/acceso/login" method="POST" className="mt-6 space-y-4">
-          <input type="hidden" name="next" value={next} />
-
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Contraseña
             </label>
             <input
               type="password"
-              name="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
               placeholder="Escribí la contraseña"
             />
           </div>
 
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {message ? <p className="text-sm text-red-600">{message}</p> : null}
 
           <button
             type="submit"

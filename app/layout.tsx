@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { AccessGuard } from "@/components/auth/AccessGuard";
 
 export const metadata: Metadata = {
   title: "TikTok Live Manager",
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <AccessGuard>{children}</AccessGuard>
+      </body>
     </html>
   );
 }
