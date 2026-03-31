@@ -5,7 +5,7 @@ export default function LivesPage() {
   return (
     <AppShell
       title="Lives"
-      description="Crear, activar y cerrar transmisiones desde la interfaz."
+      description="Crear, activar, cerrar y revisar historial de lives."
     >
       <LivesManager />
     </AppShell>
