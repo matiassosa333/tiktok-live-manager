@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 type AccessPageProps = {
   searchParams: Promise<{
     next?: string;
