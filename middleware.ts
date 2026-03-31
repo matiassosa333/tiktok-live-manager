@@ -4,7 +4,7 @@ const PUBLIC_PATHS = ["/acceso"];
 const PUBLIC_API_PREFIX = "/api/acceso";
 
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
 
   if (
     pathname.startsWith("/_next") ||
@@ -20,6 +20,7 @@ export function middleware(request: NextRequest) {
 
   if (session !== "ok") {
     const loginUrl = new URL("/acceso", request.url);
+    loginUrl.searchParams.set("next", `${pathname}${search}`);
     return NextResponse.redirect(loginUrl);
   }
 

@@ -20,7 +20,9 @@ export async function POST(request: NextRequest) {
 
   const response = NextResponse.json({ ok: true });
 
-  response.cookies.set("app_access", "ok", {
+  response.cookies.set({
+    name: "app_access",
+    value: "ok",
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

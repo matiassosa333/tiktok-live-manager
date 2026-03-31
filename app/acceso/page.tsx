@@ -1,10 +1,14 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 export default function AccessPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const searchParams = useSearchParams();
+
+  const next = searchParams.get("next") || "/dashboard";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,7 +29,7 @@ export default function AccessPage() {
       return;
     }
 
-    window.location.href = "/dashboard";
+    window.location.href = next;
   }
 
   return (

@@ -174,7 +174,7 @@ export function ClientsManager() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="min-h-[100px] w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+              className="min-h-25 w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
               placeholder="Observaciones de la clienta"
             />
           </div>
