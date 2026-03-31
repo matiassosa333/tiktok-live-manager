@@ -1,24 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const password = body?.password;
+  const formData = await request.formData();
+
+  const password = String(formData.get("password") || "");
+  const next = String(formData.get("next") || "/dashboard");
 
   if (!process.env.APP_ACCESS_PASSWORD) {
-    return NextResponse.json(
-      { error: "Falta APP_ACCESS_PASSWORD en variables de entorno." },
-      { status: 500 }
+    const url = new URL("/acceso", request.url);
+    url.searchParams.set(
+      "error",
+      "Falta APP_ACCESS_PASSWORD en variables de entorno."
     );
+    return NextResponse.redirect(url);
   }
 
   if (password !== process.env.APP_ACCESS_PASSWORD) {
-    return NextResponse.json(
-      { error: "Contraseña incorrecta." },
-      { status: 401 }
-    );
+    const url = new URL("/acceso", request.url);
+    url.searchParams.set("next", next);
+    url.searchParams.set("error", "Contraseña incorrecta.");
+    return NextResponse.redirect(url);
   }
 
-  const response = NextResponse.json({ ok: true });
+  const safeNext =
+    next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+
+  const response = NextResponse.redirect(new URL(safeNext, request.url));
 
   response.cookies.set({
     name: "app_access",

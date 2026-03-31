@@ -9,7 +9,6 @@ export function proxy(request: NextRequest) {
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon.ico") ||
-    pathname.startsWith("/public") ||
     pathname.startsWith(PUBLIC_API_PREFIX) ||
     PUBLIC_PATHS.includes(pathname)
   ) {

@@ -1,36 +1,16 @@
-"use client";
+type AccessPageProps = {
+  searchParams: Promise<{
+    next?: string;
+    error?: string;
+  }>;
+};
 
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
-
-export default function AccessPage() {
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const searchParams = useSearchParams();
-
-  const next = searchParams.get("next") || "/dashboard";
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setMessage("");
-
-    const response = await fetch("/api/acceso/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ password }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setMessage(data.error || "No se pudo iniciar sesión.");
-      return;
-    }
-
-    window.location.href = next;
-  }
+export default async function AccessPage({
+  searchParams,
+}: AccessPageProps) {
+  const params = await searchParams;
+  const next = params.next || "/dashboard";
+  const error = params.error || "";
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 p-6">
@@ -40,21 +20,22 @@ export default function AccessPage() {
           Ingresá la contraseña para entrar al panel.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <form action="/api/acceso/login" method="POST" className="mt-6 space-y-4">
+          <input type="hidden" name="next" value={next} />
+
           <div>
             <label className="mb-2 block text-sm font-medium text-slate-700">
               Contraseña
             </label>
             <input
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              name="password"
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
               placeholder="Escribí la contraseña"
             />
           </div>
 
-          {message ? <p className="text-sm text-red-600">{message}</p> : null}
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
           <button
             type="submit"
