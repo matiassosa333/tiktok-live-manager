@@ -208,8 +208,8 @@ Total general: Gs. ${total.toLocaleString("es-PY")}`;
   return (
     <div className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
       <SectionCard
-        title="Resumen del live activo"
-        description="Vista final antes de cerrar el live."
+        title="Resumen final"
+        description="Vista operativa para terminar el live actual."
       >
         {message ? <p className="mb-4 text-sm text-slate-700">{message}</p> : null}
 
@@ -255,7 +255,7 @@ Total general: Gs. ${total.toLocaleString("es-PY")}`;
 
       <SectionCard
         title="Resumen por clienta"
-        description="Totales agrupados por clienta del live activo."
+        description="Totales finales agrupados por clienta."
       >
         {loading ? (
           <p className="text-sm text-slate-600">Cargando...</p>

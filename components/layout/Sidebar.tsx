@@ -9,6 +9,8 @@ const links = [
   { href: "/live", label: "Live" },
   { href: "/clientes", label: "Clientes" },
   { href: "/carritos", label: "Carritos" },
+  { href: "/pagos", label: "Pagos" },
+  { href: "/entregas", label: "Entregas" },
   { href: "/cierre", label: "Cierre" },
 ];
 
@@ -41,6 +43,15 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <div className="mt-auto pt-4">
+        <Link
+          href="/api/acceso/logout"
+          className="block rounded-2xl border border-slate-700 px-4 py-3 text-center text-sm font-medium text-slate-200 hover:bg-slate-800"
+        >
+          Salir
+        </Link>
+      </div>
     </aside>
   );
 }
