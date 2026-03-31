@@ -4,6 +4,21 @@ import { useEffect, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { supabase } from "@/lib/supabase/client";
 
+type CustomerRelation =
+  | {
+      full_name: string;
+      whatsapp: string | null;
+      cart_enabled: boolean;
+      is_recurring: boolean;
+    }
+  | {
+      full_name: string;
+      whatsapp: string | null;
+      cart_enabled: boolean;
+      is_recurring: boolean;
+    }[]
+  | null;
+
 type ItemRow = {
   id: string;
   code: string;
@@ -12,12 +27,7 @@ type ItemRow = {
   status: string;
   customer_id: string | null;
   live_id: string;
-  customers: {
-    full_name: string;
-    whatsapp: string | null;
-    cart_enabled: boolean;
-    is_recurring: boolean;
-  }[] | null;
+  customers: CustomerRelation;
 };
 
 type GroupedCart = {
@@ -36,6 +46,12 @@ type GroupedCart = {
   }[];
   total: number;
 };
+
+function normalizeCustomer(customers: CustomerRelation) {
+  if (!customers) return null;
+  if (Array.isArray(customers)) return customers[0] || null;
+  return customers;
+}
 
 export function CartManager() {
   const [carts, setCarts] = useState<GroupedCart[]>([]);
@@ -82,9 +98,11 @@ export function CartManager() {
     const groupedMap = new Map<string, GroupedCart>();
 
     (data as ItemRow[] | null)?.forEach((item) => {
-      if (!item.customer_id || !item.customers?.[0]) return;
+      if (!item.customer_id) return;
 
-      const customer = item.customers[0];
+      const customer = normalizeCustomer(item.customers);
+      if (!customer) return;
+
       const existing = groupedMap.get(item.customer_id);
 
       if (!existing) {
@@ -116,6 +134,7 @@ export function CartManager() {
         price: item.price,
         status: item.status,
       });
+
       existing.total += item.price;
     });
 
