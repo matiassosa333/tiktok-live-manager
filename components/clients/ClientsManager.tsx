@@ -12,6 +12,7 @@ type Customer = {
   is_recurring: boolean;
   cart_enabled: boolean;
   notes: string | null;
+  is_active: boolean;
 };
 
 export function ClientsManager() {
@@ -23,6 +24,12 @@ export function ClientsManager() {
   const [tiktokUsername, setTiktokUsername] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [notes, setNotes] = useState("");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editTiktokUsername, setEditTiktokUsername] = useState("");
+  const [editWhatsapp, setEditWhatsapp] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   useEffect(() => {
     loadCustomers();
@@ -58,6 +65,7 @@ export function ClientsManager() {
       notes: notes || null,
       is_recurring: false,
       cart_enabled: false,
+      is_active: true,
     });
 
     if (error) {
@@ -70,6 +78,48 @@ export function ClientsManager() {
     setWhatsapp("");
     setNotes("");
     setMessage("Clienta creada correctamente.");
+    await loadCustomers();
+  }
+
+  function startEdit(customer: Customer) {
+    setEditingId(customer.id);
+    setEditFullName(customer.full_name);
+    setEditTiktokUsername(customer.tiktok_username || "");
+    setEditWhatsapp(customer.whatsapp || "");
+    setEditNotes(customer.notes || "");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditFullName("");
+    setEditTiktokUsername("");
+    setEditWhatsapp("");
+    setEditNotes("");
+  }
+
+  async function saveEdit(customerId: string) {
+    if (!editFullName.trim()) {
+      setMessage("El nombre es obligatorio.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("customers")
+      .update({
+        full_name: editFullName,
+        tiktok_username: editTiktokUsername || null,
+        whatsapp: editWhatsapp || null,
+        notes: editNotes || null,
+      })
+      .eq("id", customerId);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("Clienta actualizada correctamente.");
+    cancelEdit();
     await loadCustomers();
   }
 
@@ -105,6 +155,30 @@ export function ClientsManager() {
     await loadCustomers();
   }
 
+  async function toggleActive(customer: Customer) {
+    const confirmed = window.confirm(
+      customer.is_active
+        ? "¿Querés desactivar esta clienta?"
+        : "¿Querés reactivar esta clienta?"
+    );
+
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("customers")
+      .update({
+        is_active: !customer.is_active,
+      })
+      .eq("id", customer.id);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    await loadCustomers();
+  }
+
   const filteredCustomers = useMemo(() => {
     const term = search.trim().toLowerCase();
 
@@ -123,7 +197,7 @@ export function ClientsManager() {
     <div className="grid gap-4 xl:grid-cols-[0.8fr_1.2fr]">
       <SectionCard
         title="Nueva clienta"
-        description="Formulario real para cargar clientas."
+        description="Formulario completo para mantenimiento de clientas."
       >
         {message ? <p className="mb-4 text-sm text-slate-700">{message}</p> : null}
 
@@ -175,7 +249,7 @@ export function ClientsManager() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="min-h-25 w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-              placeholder="Observaciones de la clienta"
+              placeholder="Observaciones"
             />
           </div>
 
@@ -190,7 +264,7 @@ export function ClientsManager() {
 
       <SectionCard
         title="Lista de clientas"
-        description="Buscador y acciones rápidas."
+        description="Edición, activación y acciones rápidas."
       >
         <div className="mb-4">
           <input
@@ -209,44 +283,144 @@ export function ClientsManager() {
             {filteredCustomers.map((customer) => (
               <div
                 key={customer.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                className={`rounded-2xl border p-4 ${
+                  customer.is_active
+                    ? "border-slate-200 bg-slate-50"
+                    : "border-red-200 bg-red-50"
+                }`}
               >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      {customer.full_name}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      TikTok: {customer.tiktok_username || "Sin usuario"}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      WhatsApp: {customer.whatsapp || "Sin número"}
-                    </p>
-                    {customer.notes ? (
-                      <p className="mt-2 text-sm text-slate-700">
-                        Nota: {customer.notes}
+                {editingId === customer.id ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Nombre
+                      </label>
+                      <input
+                        type="text"
+                        value={editFullName}
+                        onChange={(e) => setEditFullName(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        TikTok
+                      </label>
+                      <input
+                        type="text"
+                        value={editTiktokUsername}
+                        onChange={(e) => setEditTiktokUsername(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        WhatsApp
+                      </label>
+                      <input
+                        type="text"
+                        value={editWhatsapp}
+                        onChange={(e) => setEditWhatsapp(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Notas
+                      </label>
+                      <textarea
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        className="min-h-25 w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => saveEdit(customer.id)}
+                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+                      >
+                        Guardar cambios
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={cancelEdit}
+                        className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Cancelar edición
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {customer.full_name}
                       </p>
-                    ) : null}
-                  </div>
+                      <p className="text-sm text-slate-600">
+                        TikTok: {customer.tiktok_username || "Sin usuario"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        WhatsApp: {customer.whatsapp || "Sin número"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700">
+                        {customer.is_recurring ? "Recurrente" : "Nueva"} ·{" "}
+                        {customer.cart_enabled
+                          ? "Carrito habilitado"
+                          : "Carrito no habilitado"}{" "}
+                        · {customer.is_active ? "Activa" : "Desactivada"}
+                      </p>
+                      {customer.notes ? (
+                        <p className="mt-2 text-sm text-slate-700">
+                          Nota: {customer.notes}
+                        </p>
+                      ) : null}
+                    </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleRecurring(customer)}
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                    >
-                      {customer.is_recurring ? "Quitar recurrente" : "Marcar recurrente"}
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(customer)}
+                        className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        Editar
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => toggleCart(customer)}
-                      className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                    >
-                      {customer.cart_enabled ? "Deshabilitar carrito" : "Habilitar carrito"}
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleRecurring(customer)}
+                        className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        {customer.is_recurring
+                          ? "Quitar recurrente"
+                          : "Marcar recurrente"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleCart(customer)}
+                        className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        {customer.cart_enabled
+                          ? "Deshabilitar carrito"
+                          : "Habilitar carrito"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleActive(customer)}
+                        className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+                      >
+                        {customer.is_active ? "Desactivar" : "Reactivar"}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>

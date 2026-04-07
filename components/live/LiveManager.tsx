@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { supabase } from "@/lib/supabase/client";
-import { generateRandomCode } from "@/lib/utils/generateCode";
+import { generateUniqueNumericCode } from "@/lib/utils/generateCode";
 
 type Customer = {
   id: string;
@@ -12,6 +12,7 @@ type Customer = {
   whatsapp: string | null;
   is_recurring: boolean;
   cart_enabled: boolean;
+  is_active: boolean;
 };
 
 type Live = {
@@ -21,6 +22,15 @@ type Live = {
   status: "active" | "closed";
 };
 
+type CustomerRelation =
+  | {
+      full_name: string;
+    }
+  | {
+      full_name: string;
+    }[]
+  | null;
+
 type Item = {
   id: string;
   code: string;
@@ -29,14 +39,16 @@ type Item = {
   status: string;
   created_at: string;
   customer_id: string | null;
-  customers:
-    | {
-        full_name: string;
-      }[]
-    | null;
+  customers: CustomerRelation;
 };
 
 const quickPrices = [20000, 25000, 30000, 35000, 40000, 50000];
+
+function normalizeCustomerRelation(customers: CustomerRelation) {
+  if (!customers) return null;
+  if (Array.isArray(customers)) return customers[0] || null;
+  return customers;
+}
 
 export function LiveManager() {
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -46,9 +58,6 @@ export function LiveManager() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [customerId, setCustomerId] = useState("");
-  const [status, setStatus] = useState<"pending_payment" | "in_cart">(
-    "pending_payment"
-  );
   const [generatedCode, setGeneratedCode] = useState("");
 
   const [search, setSearch] = useState("");
@@ -64,27 +73,13 @@ export function LiveManager() {
   const [pageLoading, setPageLoading] = useState(true);
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    setGeneratedCode(generateRandomCode());
-  }, []);
-
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
   const selectedCustomer = useMemo(() => {
     return customers.find((customer) => customer.id === customerId) || null;
   }, [customers, customerId]);
 
   useEffect(() => {
-    if (!selectedCustomer) return;
-
-    if (selectedCustomer.cart_enabled) {
-      setStatus("in_cart");
-    } else {
-      setStatus("pending_payment");
-    }
-  }, [selectedCustomer]);
+    loadInitialData();
+  }, []);
 
   async function loadInitialData() {
     setPageLoading(true);
@@ -109,6 +104,7 @@ export function LiveManager() {
     const { data: customerData, error: customerError } = await supabase
       .from("customers")
       .select("*")
+      .eq("is_active", true)
       .order("full_name", { ascending: true });
 
     if (customerError) {
@@ -123,6 +119,7 @@ export function LiveManager() {
       await loadItems(liveData.id);
     } else {
       setItems([]);
+      setGeneratedCode("");
     }
 
     setPageLoading(false);
@@ -153,7 +150,11 @@ export function LiveManager() {
       return;
     }
 
-    setItems((data as Item[]) || []);
+    const safeItems = (data as Item[]) || [];
+    setItems(safeItems);
+    setGeneratedCode(
+      generateUniqueNumericCode(safeItems.map((item) => item.code))
+    );
   }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -177,12 +178,12 @@ export function LiveManager() {
     setLoading(true);
     setMessage("");
 
-    const requiresFirstPayment = selectedCustomer
-      ? !selectedCustomer.cart_enabled
-      : false;
+    const finalStatus = selectedCustomer?.cart_enabled
+      ? "in_cart"
+      : "pending_payment";
 
     const reservedUntil =
-      status === "pending_payment"
+      finalStatus === "pending_payment"
         ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
         : null;
 
@@ -192,48 +193,42 @@ export function LiveManager() {
       code: generatedCode,
       description: description || null,
       price: Number(price),
-      status,
+      status: finalStatus,
       reserved_until: reservedUntil,
-      requires_first_payment: requiresFirstPayment,
+      requires_first_payment: !selectedCustomer?.cart_enabled,
     });
 
     if (error) {
-      if (error.message.includes("duplicate")) {
-        setGeneratedCode(generateRandomCode());
-        setMessage("Código duplicado, generando uno nuevo...");
-      } else {
-        setMessage(error.message);
-      }
-
+      setMessage(error.message);
       setLoading(false);
       return;
     }
 
     setDescription("");
     setPrice("");
-    setCustomerId("");
-    setStatus("pending_payment");
-    setGeneratedCode(generateRandomCode());
     setMessage("Prenda registrada correctamente.");
 
     await loadItems(activeLive.id);
     setLoading(false);
   }
 
-  async function createNewCustomer() {
+  async function createNewCustomerQuick() {
     const name = window.prompt("Nombre de la clienta");
-    if (!name) return;
+    if (!name?.trim()) return;
 
-    const tiktok = window.prompt("Usuario de TikTok (opcional)") || null;
-    const whatsapp = window.prompt("WhatsApp (opcional)") || null;
-
-    const { error } = await supabase.from("customers").insert({
-      full_name: name,
-      tiktok_username: tiktok,
-      whatsapp,
-      is_recurring: false,
-      cart_enabled: false,
-    });
+    const { data, error } = await supabase
+      .from("customers")
+      .insert({
+        full_name: name.trim(),
+        tiktok_username: null,
+        whatsapp: null,
+        notes: null,
+        is_recurring: false,
+        cart_enabled: false,
+        is_active: true,
+      })
+      .select("*")
+      .single();
 
     if (error) {
       setMessage(error.message);
@@ -242,6 +237,7 @@ export function LiveManager() {
 
     setMessage("Clienta creada correctamente.");
     await loadInitialData();
+    setCustomerId(data.id);
   }
 
   async function enableCartForCustomer() {
@@ -263,10 +259,21 @@ export function LiveManager() {
       return;
     }
 
+    if (activeLive?.id) {
+      await supabase
+        .from("items")
+        .update({
+          status: "in_cart",
+          reserved_until: null,
+        })
+        .eq("live_id", activeLive.id)
+        .eq("customer_id", selectedCustomer.id)
+        .eq("status", "pending_payment");
+    }
+
     setMessage("Carrito habilitado correctamente.");
     await loadInitialData();
     setCustomerId(selectedCustomer.id);
-    setStatus("in_cart");
   }
 
   function startEdit(item: Item) {
@@ -291,12 +298,19 @@ export function LiveManager() {
       return;
     }
 
+    const selected = customers.find((customer) => customer.id === editCustomerId);
+    const finalStatus = selected?.cart_enabled
+      ? editStatus === "cancelled"
+        ? "cancelled"
+        : editStatus === "paid"
+          ? "paid"
+          : "in_cart"
+      : editStatus;
+
     const reservedUntil =
-      editStatus === "pending_payment"
+      finalStatus === "pending_payment"
         ? new Date(Date.now() + 10 * 60 * 1000).toISOString()
         : null;
-
-    const selected = customers.find((customer) => customer.id === editCustomerId);
 
     const { error } = await supabase
       .from("items")
@@ -304,7 +318,7 @@ export function LiveManager() {
         description: editDescription || null,
         price: Number(editPrice),
         customer_id: editCustomerId || null,
-        status: editStatus,
+        status: finalStatus,
         reserved_until: reservedUntil,
         requires_first_payment: selected ? !selected.cart_enabled : false,
       })
@@ -347,12 +361,12 @@ export function LiveManager() {
   }
 
   const filteredItems = items.filter((item) => {
+    const customer = normalizeCustomerRelation(item.customers);
+
     const matchesSearch =
       item.code.toLowerCase().includes(search.toLowerCase()) ||
       (item.description || "").toLowerCase().includes(search.toLowerCase()) ||
-      (item.customers?.[0]?.full_name || "")
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      (customer?.full_name || "").toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus =
       filterStatus === "all" ? true : item.status === filterStatus;
@@ -390,7 +404,7 @@ export function LiveManager() {
                 Código automático
               </label>
               <div className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-slate-900">
-                {generatedCode}
+                {generatedCode || "--"}
               </div>
             </div>
 
@@ -460,7 +474,7 @@ export function LiveManager() {
 
                 <button
                   type="button"
-                  onClick={createNewCustomer}
+                  onClick={createNewCustomerQuick}
                   className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
                 >
                   Nueva
@@ -477,11 +491,7 @@ export function LiveManager() {
                   Estado:{" "}
                   {selectedCustomer.cart_enabled
                     ? "carrito habilitado"
-                    : "pendiente de habilitación"}
-                </p>
-                <p className="text-sm text-slate-600">
-                  Tipo:{" "}
-                  {selectedCustomer.is_recurring ? "recurrente" : "nueva"}
+                    : "debe pagar primera prenda"}
                 </p>
 
                 {!selectedCustomer.cart_enabled ? (
@@ -490,43 +500,22 @@ export function LiveManager() {
                     onClick={enableCartForCustomer}
                     className="mt-3 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
                   >
-                    Habilitar carrito
+                    Confirmar primera prenda pagada
                   </button>
                 ) : null}
               </div>
             ) : null}
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-700">
-                Estado inicial
-              </label>
-
-              <div className="grid gap-2 md:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setStatus("pending_payment")}
-                  className={`rounded-2xl px-4 py-3 text-sm font-medium ${
-                    status === "pending_payment"
-                      ? "bg-amber-500 text-white"
-                      : "border border-slate-300 text-slate-700"
-                  }`}
-                >
-                  Pendiente pago
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatus("in_cart")}
-                  className={`rounded-2xl px-4 py-3 text-sm font-medium ${
-                    status === "in_cart"
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-300 text-slate-700"
-                  }`}
-                >
-                  En carrito
-                </button>
+            {selectedCustomer ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+                Estado que se usará:{" "}
+                <strong>
+                  {selectedCustomer.cart_enabled
+                    ? "En carrito"
+                    : "Pendiente de pago inicial"}
+                </strong>
               </div>
-            </div>
+            ) : null}
 
             {message ? (
               <p className="text-sm text-slate-700">{message}</p>
@@ -573,141 +562,147 @@ export function LiveManager() {
           <p className="text-sm text-slate-600">No hay prendas para mostrar.</p>
         ) : (
           <div className="space-y-3">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className={`rounded-2xl border p-4 ${
-                  item.status === "cancelled"
-                    ? "border-red-200 bg-red-50"
-                    : item.status === "pending_payment"
-                      ? "border-amber-200 bg-amber-50"
-                      : "border-slate-200 bg-slate-50"
-                }`}
-              >
-                {editingItemId === item.id ? (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Descripción
-                      </label>
-                      <input
-                        type="text"
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                      />
-                    </div>
+            {filteredItems.map((item) => {
+              const customer = normalizeCustomerRelation(item.customers);
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Precio
-                      </label>
-                      <input
-                        type="number"
-                        value={editPrice}
-                        onChange={(e) => setEditPrice(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Clienta
-                      </label>
-                      <select
-                        value={editCustomerId}
-                        onChange={(e) => setEditCustomerId(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                      >
-                        <option value="">Sin asignar</option>
-                        {customers.map((customer) => (
-                          <option key={customer.id} value={customer.id}>
-                            {customer.full_name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="mb-2 block text-sm font-medium text-slate-700">
-                        Estado
-                      </label>
-                      <select
-                        value={editStatus}
-                        onChange={(e) => setEditStatus(e.target.value)}
-                        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
-                      >
-                        <option value="pending_payment">Pendiente pago</option>
-                        <option value="in_cart">En carrito</option>
-                        <option value="paid">Pagada</option>
-                        <option value="cancelled">Cancelada</option>
-                      </select>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => saveEdit(item.id)}
-                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
-                      >
-                        Guardar cambios
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
-                        className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        Cancelar edición
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between gap-3">
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-2xl border p-4 ${
+                    item.status === "cancelled"
+                      ? "border-red-200 bg-red-50"
+                      : item.status === "pending_payment"
+                        ? "border-amber-200 bg-amber-50"
+                        : "border-slate-200 bg-slate-50"
+                  }`}
+                >
+                  {editingItemId === item.id ? (
+                    <div className="space-y-3">
                       <div>
-                        <p className="font-semibold text-slate-900">{item.code}</p>
-                        <p className="text-sm text-slate-600">
-                          {item.description || "Sin descripción"}
-                        </p>
-                        <p className="mt-1 text-sm text-slate-700">
-                          Cliente: {item.customers?.[0]?.full_name || "Sin asignar"}
-                        </p>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Descripción
+                        </label>
+                        <input
+                          type="text"
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                        />
                       </div>
 
-                      <div className="text-right">
-                        <p className="font-semibold text-slate-900">
-                          Gs. {item.price.toLocaleString("es-PY")}
-                        </p>
-                        <p className="text-sm capitalize text-slate-600">
-                          {item.status.replace("_", " ")}
-                        </p>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Precio
+                        </label>
+                        <input
+                          type="number"
+                          value={editPrice}
+                          onChange={(e) => setEditPrice(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                        />
                       </div>
-                    </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEdit(item)}
-                        className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                      >
-                        Editar
-                      </button>
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Clienta
+                        </label>
+                        <select
+                          value={editCustomerId}
+                          onChange={(e) => setEditCustomerId(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                        >
+                          <option value="">Sin asignar</option>
+                          {customers.map((customer) => (
+                            <option key={customer.id} value={customer.id}>
+                              {customer.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                      {item.status !== "cancelled" ? (
+                      <div>
+                        <label className="mb-2 block text-sm font-medium text-slate-700">
+                          Estado
+                        </label>
+                        <select
+                          value={editStatus}
+                          onChange={(e) => setEditStatus(e.target.value)}
+                          className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-slate-500"
+                        >
+                          {!customers.find((c) => c.id === editCustomerId)?.cart_enabled ? (
+                            <option value="pending_payment">Pendiente pago</option>
+                          ) : null}
+                          <option value="in_cart">En carrito</option>
+                          <option value="paid">Pagada</option>
+                          <option value="cancelled">Cancelada</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => cancelItem(item.id)}
-                          className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+                          onClick={() => saveEdit(item.id)}
+                          className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
                         >
-                          Cancelar prenda
+                          Guardar cambios
                         </button>
-                      ) : null}
+
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Cancelar edición
+                        </button>
+                      </div>
                     </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  ) : (
+                    <>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{item.code}</p>
+                          <p className="text-sm text-slate-600">
+                            {item.description || "Sin descripción"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-700">
+                            Cliente: {customer?.full_name || "Sin clienta"}
+                          </p>
+                        </div>
+
+                        <div className="text-right">
+                          <p className="font-semibold text-slate-900">
+                            Gs. {item.price.toLocaleString("es-PY")}
+                          </p>
+                          <p className="text-sm capitalize text-slate-600">
+                            {item.status.replace("_", " ")}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(item)}
+                          className="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                          Editar
+                        </button>
+
+                        {item.status !== "cancelled" ? (
+                          <button
+                            type="button"
+                            onClick={() => cancelItem(item.id)}
+                            className="rounded-2xl bg-red-600 px-4 py-3 text-sm font-medium text-white hover:opacity-90"
+                          >
+                            Cancelar prenda
+                          </button>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </SectionCard>

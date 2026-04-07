@@ -182,7 +182,7 @@ export default async function LiveDetailPage({
                             {item.description || "Sin descripción"}
                           </p>
                           <p className="mt-1 text-sm text-slate-700">
-                            Cliente: {customer?.full_name || "Sin asignar"}
+                            Cliente: {customer?.full_name || "Sin clienta"}
                           </p>
                         </div>
 

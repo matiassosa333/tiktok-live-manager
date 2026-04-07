@@ -1,8 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { supabase } from "@/lib/supabase/client";
+
+type CustomerRelation =
+  | {
+      full_name: string;
+      whatsapp: string | null;
+    }
+  | {
+      full_name: string;
+      whatsapp: string | null;
+    }[]
+  | null;
+
+type LiveRelation =
+  | {
+      title: string;
+    }
+  | {
+      title: string;
+    }[]
+  | null;
 
 type PaymentRow = {
   id: string;
@@ -10,23 +30,23 @@ type PaymentRow = {
   payment_type: "initial" | "final";
   status: "pending" | "confirmed" | "expired";
   created_at: string;
-  customers:
-    | {
-        full_name: string;
-        whatsapp: string | null;
-      }[]
-    | null;
-  lives:
-    | {
-        title: string;
-      }[]
-    | null;
+  customer_id: string | null;
+  live_id: string | null;
+  customers: CustomerRelation;
+  lives: LiveRelation;
 };
+
+function normalizeRelation<T>(relation: T | T[] | null): T | null {
+  if (!relation) return null;
+  if (Array.isArray(relation)) return relation[0] || null;
+  return relation;
+}
 
 export function PaymentsManager() {
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
 
   useEffect(() => {
     loadPayments();
@@ -44,6 +64,8 @@ export function PaymentsManager() {
         payment_type,
         status,
         created_at,
+        customer_id,
+        live_id,
         customers (
           full_name,
           whatsapp
@@ -65,10 +87,17 @@ export function PaymentsManager() {
     setLoading(false);
   }
 
-  const filteredPayments = payments.filter((payment) => {
-    if (statusFilter === "all") return true;
-    return payment.status === statusFilter;
-  });
+  const filteredPayments = useMemo(() => {
+    return payments.filter((payment) => {
+      const matchesStatus =
+        statusFilter === "all" ? true : payment.status === statusFilter;
+
+      const matchesType =
+        typeFilter === "all" ? true : payment.payment_type === typeFilter;
+
+      return matchesStatus && matchesType;
+    });
+  }, [payments, statusFilter, typeFilter]);
 
   const totalConfirmed = payments
     .filter((payment) => payment.status === "confirmed")
@@ -98,7 +127,7 @@ export function PaymentsManager() {
 
       <SectionCard
         title="Historial de pagos"
-        description="Listado completo con filtros básicos."
+        description="Listado completo con filtros útiles."
       >
         <div className="mb-4 flex flex-wrap gap-2">
           {["all", "confirmed", "pending", "expired"].map((status) => (
@@ -115,6 +144,25 @@ export function PaymentsManager() {
               {status === "all" ? "Todos" : status}
             </button>
           ))}
+
+          {["all", "initial", "final"].map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() => setTypeFilter(type)}
+              className={`rounded-2xl px-4 py-3 text-sm font-medium ${
+                typeFilter === type
+                  ? "bg-slate-900 text-white"
+                  : "border border-slate-300 text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {type === "all"
+                ? "Todos los tipos"
+                : type === "initial"
+                  ? "Inicial"
+                  : "Final"}
+            </button>
+          ))}
         </div>
 
         {loading ? (
@@ -125,35 +173,43 @@ export function PaymentsManager() {
           </p>
         ) : (
           <div className="space-y-3">
-            {filteredPayments.map((payment) => (
-              <div
-                key={payment.id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-slate-900">
-                      {payment.customers?.[0]?.full_name || "Sin clienta"}
-                    </p>
-                    <p className="text-sm text-slate-600">
-                      Live: {payment.lives?.[0]?.title || "Sin live"}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-700">
-                      Tipo: {payment.payment_type === "initial" ? "Inicial" : "Final"}
-                    </p>
-                  </div>
+            {filteredPayments.map((payment) => {
+              const customer = normalizeRelation(payment.customers);
+              const live = normalizeRelation(payment.lives);
 
-                  <div className="text-right">
-                    <p className="font-semibold text-slate-900">
-                      Gs. {payment.amount.toLocaleString("es-PY")}
-                    </p>
-                    <p className="text-sm capitalize text-slate-600">
-                      {payment.status}
-                    </p>
+              return (
+                <div
+                  key={payment.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-slate-900">
+                        {customer?.full_name || "Sin clienta"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        Live: {live?.title || "Sin live"}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-700">
+                        Tipo: {payment.payment_type === "initial" ? "Inicial" : "Final"}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        Estado: {payment.status}
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="font-semibold text-slate-900">
+                        Gs. {payment.amount.toLocaleString("es-PY")}
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        {new Date(payment.created_at).toLocaleString("es-PY")}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </SectionCard>
