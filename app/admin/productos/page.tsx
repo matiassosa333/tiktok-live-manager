@@ -18,6 +18,7 @@ export default function AdminProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [categoria, setCategoria] = useState("economica");
 
   // Form
   const [nombre, setNombre] = useState("");
@@ -63,7 +64,7 @@ export default function AdminProductosPage() {
       .upload(path, foto);
 
     if (uploadError) {
-      setMensaje("Error subiendo foto.");
+      setMensaje("Error al subir foto.");
       setUploading(false);
       return;
     }
@@ -80,6 +81,7 @@ export default function AdminProductosPage() {
       descripcion,
       foto_url: urlData.publicUrl,
       estado: "disponible",
+      categoria,
     });
 
     if (dbError) {
@@ -89,6 +91,7 @@ export default function AdminProductosPage() {
       setNombre(""); setPrecio(""); setTalla("");
       setDescripcion(""); setFoto(null); setPreview(null);
       fetchProductos();
+      setCategoria("economica")
     }
     setUploading(false);
   }
@@ -140,9 +143,9 @@ export default function AdminProductosPage() {
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Precio ($)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Precio (₲)</label>
                 <input value={precio} onChange={e => setPrecio(e.target.value)}
-                  required type="number" step="0.01" placeholder="7.00"
+                  required type="number" step="0.01" placeholder="50000"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
               </div>
             </div>
@@ -153,6 +156,14 @@ export default function AdminProductosPage() {
                 <input value={talla} onChange={e => setTalla(e.target.value)}
                   placeholder="S / M / L / XL"
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
+                <select value={categoria} onChange={e => setCategoria(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500">
+                <option value="economica">Económica</option>
+                <option value="premium">Premium</option>
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
@@ -194,7 +205,7 @@ export default function AdminProductosPage() {
                     className="h-16 w-16 rounded-lg object-cover border" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-slate-800 truncate">{p.nombre}</p>
-                    <p className="text-sm text-slate-500">${p.precio} · {p.talla || "Sin talla"}</p>
+                    <p className="text-sm text-slate-500">₲ {Number(p.precio).toLocaleString("es-PY")} · {p.talla || "Sin talla"}</p>
                   </div>
                   <select value={p.estado}
                     onChange={e => cambiarEstado(p.id, e.target.value)}
