@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-
+export const revalidate = 0;
 type Producto = {
   id: string;
   nombre: string;
