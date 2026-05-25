@@ -23,11 +23,11 @@ export function AccessGuard({ children }: AccessGuardProps) {
 
     const saved = sessionStorage.getItem("app_access");
 
-    if (saved === "ok") {
+    if (pathname === "/acceso" || pathname === "/catalogo") {
       setAllowed(true);
       setChecking(false);
       return;
-    }
+  }
 
     router.replace(`/acceso?next=${encodeURIComponent(pathname)}`);
   }, [pathname, router]);
