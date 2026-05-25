@@ -130,7 +130,7 @@ export default async function CatalogoPage() {
           />
           <div className="text-center">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">El Roperito de Ruan</h1>
-            <p className="text-sm text-slate-400 mt-1">Ropa de segunda seleccionada con amor</p>
+            <p className="text-sm text-slate-400 mt-1">Moda nueva y semi-nueva que enamora</p>
           </div>
           <div className="flex items-center gap-4 mt-1">
             <a href={"https://wa.me/" + WHATSAPP_NUMBER} target="_blank" rel="noopener noreferrer"
