@@ -128,7 +128,7 @@ export default function CatalogoClient({ productos }: { productos: Producto[] })
             {"WhatsApp"}
           </a>
           <span style={{ color: "rgba(255,255,255,0.4)" }}>|</span>
-          <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer"
+          <a href="https://www.tiktok.com/@elroperitoderuan?_r=1&_t=ZS-96duW2QLeJZ" target="_blank" rel="noopener noreferrer"
             style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", textDecoration: "none" }}>
             {"TikTok"}
           </a>
