@@ -13,6 +13,7 @@ type Producto = {
   fotos: string[];
   estado: string;
   categoria: string;
+  subcategoria: string;
 };
 
 export default async function CatalogoPage() {
@@ -23,6 +24,5 @@ export default async function CatalogoPage() {
     .order("created_at", { ascending: false });
 
   const productos: Producto[] = data || [];
-
   return <CatalogoClient productos={productos} />;
 }

@@ -7,6 +7,8 @@ type AccessGuardProps = {
   children: React.ReactNode;
 };
 
+const PUBLIC_ROUTES = ["/acceso", "/catalogo"];
+
 export function AccessGuard({ children }: AccessGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -15,7 +17,7 @@ export function AccessGuard({ children }: AccessGuardProps) {
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (pathname === "/acceso") {
+    if (PUBLIC_ROUTES.includes(pathname)) {
       setAllowed(true);
       setChecking(false);
       return;
@@ -23,11 +25,11 @@ export function AccessGuard({ children }: AccessGuardProps) {
 
     const saved = sessionStorage.getItem("app_access");
 
-    if (pathname === "/acceso" || pathname === "/catalogo") {
+    if (saved === "ok") {
       setAllowed(true);
       setChecking(false);
       return;
-  }
+    }
 
     router.replace(`/acceso?next=${encodeURIComponent(pathname)}`);
   }, [pathname, router]);
